@@ -7,7 +7,6 @@ use crate::{
 
 mod helper;
 pub mod parsing;
-pub mod parsing_types;
 pub mod solver;
 
 /// Duration between `start` and `end` in seconds

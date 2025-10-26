@@ -1,4 +1,4 @@
-use nanosat_rs::{parsing_types::ClauseReceiver, solver::clauses::Literal};
+use nanosat_rs::{parsing::ClauseReceiver, solver::literal::Literal};
 
 /// Mock for solver type
 #[derive(Clone, Debug, Default)]

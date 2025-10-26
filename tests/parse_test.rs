@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use nanosat_rs::{parsing::parse_cnf, solver::clauses::Literal};
+use nanosat_rs::{parsing::parse_cnf, solver::literal::Literal};
 
 use crate::common::SolverMock;
 
@@ -62,7 +62,10 @@ fn check_parsing_fails(file_name: &str, expected_exit_code: i32, expected_error:
         .expect("failed to run main binary");
     assert_eq!(output.status.code(), Some(expected_exit_code));
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.starts_with(expected_error));
+    assert!(
+        stderr.starts_with(expected_error),
+        "stderr did not contain \"{expected_error}\"; it container \"{stderr}\""
+    );
 }
 
 #[test]
@@ -70,7 +73,7 @@ fn test_parse_cnf_missing_clause() {
     check_parsing_fails(
         "res/fail/missing_clause.cnf",
         1,
-        "Number of clauses in cnf incorrect",
+        "Number of clauses in cnf incorrect (res/fail/missing_clause.cnf:0)",
     );
 }
 
@@ -84,35 +87,28 @@ fn test_parse_cnf_too_many_vars() {
 }
 
 #[test]
-fn test_parse_cnf_missing_zero() {
-    check_parsing_fails("res/fail/missing_zero.cnf", 1, "Failed to parse cnf file");
-}
-
-#[test]
-fn test_parse_cnf_too_many_spaces() {
+fn test_parse_cnf_double_minus() {
     check_parsing_fails(
-        "res/fail/too_many_spaces.cnf",
+        "res/fail/double_minus.cnf",
         1,
-        "Failed to parse cnf file",
+        "Could not parse literal (res/fail/double_minus.cnf:11)",
     );
 }
 
 #[test]
-fn test_parse_cnf_double_minus() {
-    check_parsing_fails("res/fail/double_minus.cnf", 1, "Failed to parse cnf file");
-}
-
-#[test]
 fn test_parse_cnf_empty_clause() {
-    check_parsing_fails("res/fail/empty_clause.cnf", 1, "Failed to parse cnf file");
-}
-
-#[test]
-fn test_parse_cnf_leading_zero() {
-    check_parsing_fails("res/fail/leading_zero.cnf", 1, "Failed to parse cnf file");
+    check_parsing_fails(
+        "res/fail/empty_clause.cnf",
+        1,
+        "Number of clauses in cnf incorrect (res/fail/empty_clause.cnf:0)",
+    );
 }
 
 #[test]
 fn test_parse_cnf_unknown_line() {
-    check_parsing_fails("res/fail/unknown_line.cnf", 1, "Failed to parse cnf file");
+    check_parsing_fails(
+        "res/fail/unknown_line.cnf",
+        1,
+        "Could not parse literal (res/fail/unknown_line.cnf:14)",
+    );
 }

@@ -12,7 +12,7 @@ We have adapted small, relevant pieces from [minisat](https://github.com/niklass
 
 | | nanosat-rs (ours) | [minisat-core](https://github.com/niklasso/minisat) | [kissat](https://github.com/arminbiere/kissat) |
 |-|-|-|-|
-| Lines of code (`cloc`) | 1,294 | 2,543 | 35,348 |
+| Lines of code (`cloc`) | 1,162 | 2,543 | 35,348 |
 | Language | Rust | C++ | C |
 | No compiler warnings | ✅ | ❌ | ❌ |
 | No custom allocators & union magic | ✅ | ❌ | ❌ |

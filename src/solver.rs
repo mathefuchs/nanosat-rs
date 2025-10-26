@@ -1,15 +1,17 @@
 use crate::{
     helper::{f64_to_usize_trunc, usize_to_f64},
-    parsing_types::ClauseReceiver,
-    solver::clauses::{
-        ClauseRef, Clauses, Literal, Variable, VariableMetadata, VariableValue, Watch,
-    },
+    parsing::ClauseReceiver,
+    solver::clause::{ClauseRef, Clauses, VariableMetadata, Watch},
+    solver::literal::Literal,
+    solver::variable::{Variable, VariableValue},
 };
 use rand::{Rng, SeedableRng, seq::SliceRandom};
 
-pub mod clauses;
+pub mod clause;
+pub mod literal;
 mod options;
 mod restart;
+pub mod variable;
 
 /// Verbosity level enum
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -66,11 +68,11 @@ enum VariableStatus {
 pub struct Solver {
     // -- Representation of the SAT problem instance
     /// All clauses
-    clauses: Clauses,
+    clauses: Clauses<false>,
 
     // -- Solver data structures
     /// All learned clauses
-    learned_clauses: Clauses,
+    learned_clauses: Clauses<true>,
     /// Stack of all decisions currently made
     trail: Vec<Literal>,
     /// Where the decision levels in `trail` start
@@ -754,16 +756,16 @@ impl Solver {
     }
 
     /// Remove the satisfied clauses in the given container
-    fn remove_satisfied_clauses(&mut self, is_learned: bool) {
-        let clause_len = if is_learned {
+    fn remove_satisfied_clauses<const IS_LEARNED: bool>(&mut self) {
+        let clause_len = if IS_LEARNED {
             self.learned_clauses.len()
         } else {
             self.clauses.len()
         };
 
         for clause_idx in 0..clause_len {
-            let clause_ref = ClauseRef::from_idx(clause_idx, is_learned);
-            let is_clause_deleted = if is_learned {
+            let clause_ref = ClauseRef::from_idx(clause_idx, IS_LEARNED);
+            let is_clause_deleted = if IS_LEARNED {
                 self.learned_clauses[clause_ref].is_empty()
             } else {
                 self.clauses[clause_ref].is_empty()
@@ -775,10 +777,12 @@ impl Solver {
             }
 
             // Check if clause already satisfied
-            let is_clause_already_satisfied = if is_learned {
-                self.is_clause_satisfied(&self.learned_clauses[clause_ref])
+            let is_clause_already_satisfied = if IS_LEARNED {
+                self.learned_clauses
+                    .is_clause_satisfied(clause_ref, &self.variable_values)
             } else {
-                self.is_clause_satisfied(&self.clauses[clause_ref])
+                self.clauses
+                    .is_clause_satisfied(clause_ref, &self.variable_values)
             };
             if is_clause_already_satisfied {
                 // Remove clause
@@ -786,7 +790,7 @@ impl Solver {
             } else {
                 // Trim clause; first two literals cannot be true since otherwise
                 // `isClauseSatisfied()` and cannot be false by invariant
-                let clause = if is_learned {
+                let clause = if IS_LEARNED {
                     &mut self.learned_clauses[clause_ref]
                 } else {
                     &mut self.clauses[clause_ref]
@@ -817,8 +821,8 @@ impl Solver {
         }
 
         // Remove satisfied clauses
-        self.remove_satisfied_clauses(true);
-        self.remove_satisfied_clauses(false);
+        self.remove_satisfied_clauses::<true>();
+        self.remove_satisfied_clauses::<false>();
 
         // Update unset variables
         self.unset_variables.clear();
@@ -831,16 +835,6 @@ impl Solver {
 
         // Problem instance still satisfiable
         true
-    }
-
-    /// Checks whether the given clause is satisfied
-    fn is_clause_satisfied(&self, clause: &Vec<Literal>) -> bool {
-        for literal in clause {
-            if literal.is_true(&self.variable_values) {
-                return true;
-            }
-        }
-        false
     }
 }
 

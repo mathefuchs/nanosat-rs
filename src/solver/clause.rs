@@ -1,129 +1,7 @@
-use std::ops::Not;
-
-/// Variable type
-pub type Variable = usize;
-
-/// Variable value type
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum VariableValue {
-    False = 0,
-    True = 1,
-    Unset = 2,
-}
-
-impl VariableValue {
-    /// Variable from bool
-    #[must_use]
-    pub const fn from_bool(value: bool) -> Self {
-        if value { Self::True } else { Self::False }
-    }
-
-    /// Whether is false
-    #[must_use]
-    pub fn is_false(self) -> bool {
-        self == VariableValue::False
-    }
-    /// Whether is true
-    #[must_use]
-    pub fn is_true(self) -> bool {
-        self == VariableValue::True
-    }
-    /// Whether is unset
-    #[must_use]
-    pub fn is_unset(self) -> bool {
-        self == VariableValue::Unset
-    }
-}
-
-impl Default for VariableValue {
-    fn default() -> Self {
-        Self::Unset
-    }
-}
-
-impl PartialEq<bool> for VariableValue {
-    fn eq(&self, other: &bool) -> bool {
-        *self == VariableValue::from_bool(*other)
-    }
-}
-
-/// Literal type
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct Literal {
-    /// Literal representation; positive and negative literals are consecutive;
-    /// `[    0, 1,     2, 3,     4, 5, ...]`
-    /// `[not 0, 0, not 1, 1, not 2, 2, ...]`
-    repr: Variable,
-}
-
-impl Literal {
-    /// Invalid literal
-    const INVALID: Variable = Variable::MAX;
-
-    /// Constructs a literal from a variable (0..n)
-    /// with polarity (+ : true, - : false)
-    #[must_use]
-    pub const fn from_var_with_polarity(variable: Variable, polarity: bool) -> Self {
-        Literal {
-            repr: 2 * variable + polarity as Variable,
-        }
-    }
-
-    /// Access representation for indexing
-    #[must_use]
-    pub const fn repr(&self) -> usize {
-        self.repr
-    }
-    /// The variable used in the literal for indexing purposes
-    #[must_use]
-    pub const fn var(&self) -> usize {
-        self.repr >> 1
-    }
-    /// The polarity of the literal (+ : true, - : false)
-    #[must_use]
-    pub const fn polarity(&self) -> bool {
-        (self.repr & 1) != 0
-    }
-    /// Whether is valid
-    #[must_use]
-    pub const fn valid(&self) -> bool {
-        self.repr != Self::INVALID
-    }
-    /// Whether literal evaluates to true
-    #[must_use]
-    pub fn is_true(&self, model: &[VariableValue]) -> bool {
-        model[self.var()] == self.polarity()
-    }
-    /// Whether literal evaluates to false
-    #[must_use]
-    pub fn is_false(&self, model: &[VariableValue]) -> bool {
-        model[self.var()] == !self.polarity()
-    }
-    /// Whether literal evaluates to undetermined value
-    #[must_use]
-    pub fn is_unset(&self, model: &[VariableValue]) -> bool {
-        model[self.var()] == VariableValue::Unset
-    }
-}
-
-impl Default for Literal {
-    fn default() -> Self {
-        Self {
-            repr: Self::INVALID,
-        }
-    }
-}
-
-/// Implement negation for literals
-impl Not for Literal {
-    type Output = Self;
-
-    fn not(self) -> Self::Output {
-        Literal {
-            repr: self.repr ^ 1,
-        }
-    }
-}
+use crate::solver::{
+    literal::Literal,
+    variable::{Variable, VariableValue},
+};
 
 /// Clause reference type
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -206,14 +84,14 @@ pub struct VariableMetadata {
 
 /// Class managing the creation, deletion, and access of clauses
 #[derive(Clone, Default)]
-pub struct Clauses {
+pub struct Clauses<const IS_LEARNED: bool> {
     /// Stores all clauses
     container: Vec<Vec<Literal>>,
     /// Stores indices of empty vectors
     free_indices: Vec<usize>,
 }
 
-impl Clauses {
+impl<const IS_LEARNED: bool> Clauses<IS_LEARNED> {
     /// Size
     #[must_use]
     pub const fn len(&self) -> usize {
@@ -242,6 +120,7 @@ impl Clauses {
 
     /// Remove clause
     pub fn remove_clause(&mut self, clause_ref: ClauseRef) {
+        debug_assert_eq!(clause_ref.is_learned(), IS_LEARNED);
         let idx = clause_ref.idx();
         if idx == self.container.len() - 1 {
             self.container.pop();
@@ -250,10 +129,26 @@ impl Clauses {
             self.free_indices.push(clause_ref.idx());
         }
     }
+
+    /// Whether clause is satisfied
+    #[must_use]
+    pub fn is_clause_satisfied(
+        &self,
+        clause_ref: ClauseRef,
+        variable_values: &[VariableValue],
+    ) -> bool {
+        debug_assert_eq!(clause_ref.is_learned(), IS_LEARNED);
+        for &literal in &self[clause_ref] {
+            if literal.is_true(variable_values) {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 /// Clause at given index
-impl std::ops::Index<ClauseRef> for Clauses {
+impl<const IS_LEARNED: bool> std::ops::Index<ClauseRef> for Clauses<IS_LEARNED> {
     type Output = Vec<Literal>;
 
     fn index(&self, index: ClauseRef) -> &Self::Output {
@@ -261,7 +156,7 @@ impl std::ops::Index<ClauseRef> for Clauses {
         &self.container[index.idx()]
     }
 }
-impl std::ops::IndexMut<ClauseRef> for Clauses {
+impl<const IS_LEARNED: bool> std::ops::IndexMut<ClauseRef> for Clauses<IS_LEARNED> {
     fn index_mut(&mut self, index: ClauseRef) -> &mut Self::Output {
         debug_assert!(index.valid());
         &mut self.container[index.idx()]
