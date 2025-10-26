@@ -218,7 +218,7 @@ impl Solver {
                     self.assign_literal(learned_clause[0], ClauseRef::default());
                 } else {
                     // Else, learn clause and propagate first literal
-                    let clause_ref = self.attach_clause(learned_clause.clone(), true);
+                    let clause_ref = self.attach_clause::<true>(learned_clause.clone());
                     self.assign_literal(learned_clause[0], clause_ref);
                 }
 
@@ -704,11 +704,11 @@ impl Solver {
     }
 
     /// Attaches a clause by creating watches
-    fn attach_clause(&mut self, literals: Vec<Literal>, is_learned: bool) -> ClauseRef {
+    fn attach_clause<const IS_LEARNED: bool>(&mut self, literals: Vec<Literal>) -> ClauseRef {
         // Add clause
         let first_literal = literals[0];
         let second_literal = literals[1];
-        let clause_ref = if is_learned {
+        let clause_ref = if IS_LEARNED {
             self.stats.num_learned_clauses += 1;
             self.stats.num_literals_in_learned_clauses += literals.len();
             self.learned_clauses.add_clause(literals, true)
@@ -911,7 +911,7 @@ impl ClauseReceiver for Solver {
         }
 
         // Add clause
-        self.attach_clause(copied_literals, false);
+        self.attach_clause::<false>(copied_literals);
         true
     }
 }
